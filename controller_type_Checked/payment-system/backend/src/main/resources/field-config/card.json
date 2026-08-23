@@ -1,0 +1,7 @@
+[
+  { "name": "cardToken",    "label": "Card Token",    "type": "text",   "required": true, "pattern": null, "options": null },
+  { "name": "expiryMonth",  "label": "Expiry Month",  "type": "text",   "required": true, "pattern": "^(0[1-9]|1[0-2])$", "options": null },
+  { "name": "expiryYear",   "label": "Expiry Year",   "type": "text",   "required": true, "pattern": "^[0-9]{4}$", "options": null },
+  { "name": "amount",       "label": "Amount",        "type": "number", "required": true, "pattern": null, "options": null },
+  { "name": "currency",     "label": "Currency",      "type": "select", "required": true, "pattern": null, "options": ["USD", "EUR", "GBP"] }
+]

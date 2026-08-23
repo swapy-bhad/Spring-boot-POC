@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Payment Processing System — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg: #F3F4F6;
+    --panel: #FFFFFF;
+    --ink: #14171A;
+    --ink-soft: #4B5261;
+    --line: #DFE3E8;
+    --accent: #3454D1;
+    --accent-soft: #EDF0FC;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --sans: 'IBM Plex Sans', -apple-system, sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+  }
+  .wrap{ max-width: 1080px; margin: 0 auto; padding: 56px 28px 120px; }
+
+  header.hero{
+    display:flex; flex-direction:column; gap:14px;
+    padding-bottom: 40px; margin-bottom: 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow{
+    font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+  }
+  h1{ font-size: 34px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  .subtitle{ color: var(--ink-soft); font-size: 15.5px; max-width: 640px; }
+  .stack-badges{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 6px; }
+  .badge{
+    font-family: var(--mono); font-size: 12px; padding: 4px 10px;
+    background: var(--accent-soft); color: var(--accent); border-radius: 4px;
+    border: 1px solid #D8DFF9;
+  }
+
+  nav.toc{
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 56px;
+  }
+  nav.toc a{
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft);
+    text-decoration: none; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--panel); transition: border-color .15s, color .15s;
+  }
+  nav.toc a:hover{ border-color: var(--accent); color: var(--accent); }
+
+  section.diagram-section{
+    margin-bottom: 64px; scroll-margin-top: 24px;
+  }
+  .section-head{
+    display:flex; align-items: baseline; gap: 14px; margin-bottom: 6px;
+  }
+  .section-num{
+    font-family: var(--mono); font-size: 13px; color: var(--accent);
+    font-weight: 600; min-width: 26px;
+  }
+  h2{ font-size: 20px; margin: 0; font-weight: 700; }
+  .section-desc{
+    color: var(--ink-soft); font-size: 14.5px; margin: 6px 0 20px 40px;
+    max-width: 680px;
+  }
+  .panel{
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 24px; overflow-x: auto;
+  }
+  .panel .mermaid{ display:flex; justify-content:center; min-width: 560px; }
+
+  .callout{
+    margin: 14px 0 0 40px; padding: 12px 14px; background: var(--accent-soft);
+    border-left: 3px solid var(--accent); border-radius: 4px;
+    font-size: 13.5px; color: var(--ink); max-width: 680px;
+  }
+  .callout code{ font-family: var(--mono); background: #fff; padding: 1px 5px; border-radius: 3px; border: 1px solid #D8DFF9; }
+
+  footer{
+    margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12px; color: var(--ink-soft);
+  }
+
+  @media print{
+    body{ background: #fff; }
+    nav.toc{ display:none; }
+    .panel{ break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">Architecture Reference</div>
+    <h1>Payment Processing System</h1>
+    <p class="subtitle">
+      One generic payment API, per-method processing via a Strategy/Provider pattern,
+      wired through Spring's dependency injection so new payment methods register
+      themselves with zero changes to existing code.
+    </p>
+    <div class="stack-badges">
+      <span class="badge">Java 21</span>
+      <span class="badge">Spring Boot 3.3</span>
+      <span class="badge">React 18</span>
+      <span class="badge">Strategy + Template Method + Adapter</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#component">01 · Component architecture</a>
+    <a href="#class">02 · Class diagram</a>
+    <a href="#sequence">03 · Request sequence</a>
+    <a href="#filter">04 · Filter validation logic</a>
+    <a href="#extend">05 · Adding a new method</a>
+    <a href="#ui">06 · Data-driven UI flow</a>
+  </nav>
+
+  <!-- 01 COMPONENT ARCHITECTURE -->
+  <section class="diagram-section" id="component">
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <h2>Component architecture</h2>
+    </div>
+    <p class="section-desc">
+      How the pieces sit relative to each other, from the browser down to external
+      payment gateways. Everything left of the dotted line is method-agnostic;
+      everything right of it is method-specific and pluggable.
+    </p>
+    <div class="panel">
+      <pre class="mermaid">
+graph LR
+  UI["React App<br/><span style='font-family:monospace'>DynamicPaymentForm</span>"]
+
+  subgraph Generic["Method-agnostic core"]
+    FILTER["PaymentMethodHeaderFilter<br/>reads &amp; validates header"]
+    CTRL["PaymentController<br/>POST /api/payments"]
+    REG["PaymentProcessorRegistry<br/>Map&lt;String, PaymentProcessor&gt;"]
+    CFGCTRL["PaymentMethodConfigController<br/>GET /api/payment-methods/*"]
+    CFGSVC["PaymentMethodFieldConfigService"]
+  end
+
+  subgraph Card["CARD (pluggable)"]
+    CP["CardPaymentProcessor"]
+    CG["CardGatewayClient"]
+  end
+
+  subgraph Paypal["PAYPAL (pluggable)"]
+    PP["PaypalPaymentProcessor"]
+    PG["PaypalGatewayClient"]
+  end
+
+  subgraph Future["Next method (pluggable)"]
+    FP["...PaymentProcessor"]
+    FG["...GatewayClient"]
+  end
+
+  JSON[("field-config/*.json")]
+
+  UI -->|"POST body + X-Payment-Method"| FILTER
+  FILTER --> CTRL
+  CTRL --> REG
+  REG -.->|resolves| CP
+  REG -.->|resolves| PP
+  REG -.->|resolves| FP
+  UI -->|"GET methods / fields"| CFGCTRL
+  CFGCTRL --> CFGSVC
+  CFGSVC --> JSON
+  CP --> CG --> EXT1[["Card Gateway API"]]
+  PP --> PG --> EXT2[["PayPal API"]]
+  FP -.-> FG -.-> EXT3[["Future Gateway"]]
+
+  classDef core fill:#EDF0FC,stroke:#3454D1,color:#14171A;
+  classDef plug fill:#FFFFFF,stroke:#DFE3E8,color:#14171A;
+  classDef ext fill:#F3F4F6,stroke:#4B5261,color:#4B5261,stroke-dasharray: 3 3;
+  class FILTER,CTRL,REG,CFGCTRL,CFGSVC core;
+  class CP,CG,PP,PG,FP,FG plug;
+  class EXT1,EXT2,EXT3 ext;
+      </pre>
+    </div>
+    <div class="callout">
+      The <code>Future</code> subgraph is dashed because it doesn't exist yet — it's there to show that
+      adding it means writing three new boxes, not modifying any box in <code>Generic</code>.
+    </div>
+  </section>
+
+  <!-- 02 CLASS DIAGRAM -->
+  <section class="diagram-section" id="class">
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <h2>Class diagram</h2>
+    </div>
+    <p class="section-desc">
+      <code style="font-family:var(--mono)">PaymentProcessor</code> is the strategy interface.
+      <code style="font-family:var(--mono)">AbstractPaymentProcessor</code> is a generic Template Method
+      base class — it owns the five-step orchestration once; each concrete processor only fills in the steps.
+    </p>
+    <div class="panel">
+      <pre class="mermaid">
+classDiagram
+  class PaymentProcessor {
+    <<interface>>
+    +getMethodType() String
+    +process(JsonNode raw) PaymentResult
+  }
+
+  class AbstractPaymentProcessor~TRequest, TGatewayReq, TGatewayResp~ {
+    <<abstract>>
+    #ObjectMapper objectMapper
+    +process(JsonNode raw) PaymentResult
+    #parseRequest(JsonNode raw) TRequest*
+    #validate(TRequest req)*
+    #toGatewayRequest(TRequest req) TGatewayReq*
+    #callGateway(TGatewayReq req) TGatewayResp*
+    #toPaymentResult(TGatewayResp resp) PaymentResult*
+  }
+
+  class CardPaymentProcessor {
+    +TYPE : String = "CARD"
+    -CardGatewayClient gatewayClient
+    -Validator validator
+  }
+
+  class PaypalPaymentProcessor {
+    +TYPE : String = "PAYPAL"
+    -PaypalGatewayClient gatewayClient
+    -Validator validator
+  }
+
+  class PaymentProcessorRegistry {
+    -Map~String, PaymentProcessor~ processorsByType
+    +resolve(String methodType) PaymentProcessor
+    +isSupported(String methodType) bool
+    +getSupportedMethods() Set~String~
+  }
+
+  class PaymentMethodContext {
+    <<static / ThreadLocal>>
+    +set(String methodType)
+    +get() String
+    +clear()
+  }
+
+  class PaymentMethodHeaderFilter {
+    -PaymentProcessorRegistry registry
+    +doFilterInternal(req, res, chain)
+  }
+
+  class PaymentController {
+    -PaymentProcessorRegistry registry
+    +processPayment(JsonNode payload) PaymentResult
+  }
+
+  class PaymentMethodConfigController {
+    +supportedMethods() Set~String~
+    +fields(String method) List~FieldDefinition~
+  }
+
+  class PaymentMethodFieldConfigService {
+    -Map~String, List~FieldDefinition~~ cache
+    +getFields(String methodType) List~FieldDefinition~
+  }
+
+  class FieldDefinition {
+    +String name
+    +String label
+    +String type
+    +bool required
+    +String pattern
+    +List~String~ options
+  }
+
+  class CardGatewayClient { +charge(CardGatewayRequest) CardGatewayResponse }
+  class PaypalGatewayClient { +capture(PaypalGatewayRequest) PaypalGatewayResponse }
+  class PaymentResult { +String transactionId +PaymentStatus status +String message }
+
+  PaymentProcessor <|.. AbstractPaymentProcessor
+  AbstractPaymentProcessor <|-- CardPaymentProcessor
+  AbstractPaymentProcessor <|-- PaypalPaymentProcessor
+  PaymentProcessorRegistry o-- "many" PaymentProcessor : auto-collected by Spring
+  PaymentController --> PaymentProcessorRegistry
+  PaymentController --> PaymentMethodContext : reads
+  PaymentMethodHeaderFilter --> PaymentProcessorRegistry
+  PaymentMethodHeaderFilter --> PaymentMethodContext : writes
+  CardPaymentProcessor --> CardGatewayClient
+  PaypalPaymentProcessor --> PaypalGatewayClient
+  AbstractPaymentProcessor ..> PaymentResult : produces
+  PaymentMethodConfigController --> PaymentProcessorRegistry
+  PaymentMethodConfigController --> PaymentMethodFieldConfigService
+  PaymentMethodFieldConfigService --> FieldDefinition : loads
+      </pre>
+    </div>
+    <div class="callout">
+      Note the direction of the registry arrow: <code>PaymentProcessorRegistry</code> depends on the
+      <em>interface</em>, and Spring injects <code>List&lt;PaymentProcessor&gt;</code> — every
+      <code>@Component</code> implementing it joins the map automatically, so this diagram doesn't change
+      shape when a method is added, only gains another leaf under <code>AbstractPaymentProcessor</code>.
+    </div>
+  </section>
+
+  <!-- 03 SEQUENCE -->
+  <section class="diagram-section" id="sequence">
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <h2>Request sequence — happy path</h2>
+    </div>
+    <p class="section-desc">
+      A single CARD payment from click to response. PAYPAL (or any future method) follows the identical
+      shape, just swapping the last three participants.
+    </p>
+    <div class="panel">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant UI as React UI
+  participant F as PaymentMethodHeaderFilter
+  participant C as PaymentController
+  participant R as PaymentProcessorRegistry
+  participant P as CardPaymentProcessor
+  participant V as Validator
+  participant GC as CardGatewayClient
+  participant EXT as Card Gateway (external)
+
+  UI->>F: POST /api/payments\nheader X-Payment-Method: CARD\nbody {cardToken, amount, ...}
+  F->>R: isSupported("CARD")?
+  R-->>F: true
+  F->>F: PaymentMethodContext.set("CARD")
+  F->>C: chain.doFilter()
+  C->>R: resolve("CARD")
+  R-->>C: CardPaymentProcessor instance
+  C->>P: process(rawPayload)
+  P->>P: parseRequest(raw) → CardPaymentRequest
+  P->>V: validate(request)
+  V-->>P: ok (or throws InvalidPaymentPayloadException)
+  P->>P: toGatewayRequest(request) → CardGatewayRequest
+  P->>GC: charge(gatewayRequest)
+  GC->>EXT: (real integration point)
+  EXT-->>GC: gateway response
+  GC-->>P: CardGatewayResponse
+  P->>P: toPaymentResult(response) → PaymentResult
+  P-->>C: PaymentResult
+  C-->>UI: 200 OK {transactionId, status, message}
+  F->>F: PaymentMethodContext.clear() (finally block)
+      </pre>
+    </div>
+  </section>
+
+  <!-- 04 FILTER LOGIC -->
+  <section class="diagram-section" id="filter">
+    <div class="section-head">
+      <span class="section-num">04</span>
+      <h2>Filter validation logic</h2>
+    </div>
+    <p class="section-desc">
+      The one place that understands "the method identifier lives in a header." Everything downstream
+      can assume the method is already valid.
+    </p>
+    <div class="panel">
+      <pre class="mermaid">
+flowchart TD
+  A["Incoming request"] --> B{"Is it POST /api/payments?"}
+  B -- No --> Z1["Pass through untouched"]
+  B -- Yes --> C{"X-Payment-Method\nheader present?"}
+  C -- No --> D["400 MISSING_HEADER"]
+  C -- Yes --> E{"registry.isSupported(method)?"}
+  E -- No --> F["400 UNSUPPORTED_PAYMENT_METHOD"]
+  E -- Yes --> G["PaymentMethodContext.set(method)"]
+  G --> H["chain.doFilter() → Controller"]
+  H --> I["finally: PaymentMethodContext.clear()"]
+
+  classDef err fill:#FDEDED,stroke:#C0392B,color:#7A1F1F;
+  classDef ok fill:#EDF0FC,stroke:#3454D1,color:#14171A;
+  class D,F err;
+  class G,H,I ok;
+      </pre>
+    </div>
+  </section>
+
+  <!-- 05 EXTENSION FLOW -->
+  <section class="diagram-section" id="extend">
+    <div class="section-head">
+      <span class="section-num">05</span>
+      <h2>Adding a new payment method</h2>
+    </div>
+    <p class="section-desc">
+      The four steps to introduce, say, APPLEPAY — and everything in gray that you deliberately do
+      <em>not</em> touch.
+    </p>
+    <div class="panel">
+      <pre class="mermaid">
+flowchart LR
+  subgraph Write["What you write"]
+    direction TB
+    S1["1. DTOs\nApplePayPaymentRequest\n+ gateway req/resp shapes"]
+    S2["2. ApplePayGatewayClient\n(Adapter to real API)"]
+    S3["3. ApplePayPaymentProcessor\nextends AbstractPaymentProcessor\n@Component, TYPE = 'APPLEPAY'"]
+    S4["4. field-config/applepay.json"]
+    S1 --> S2 --> S3 --> S4
+  end
+
+  subgraph Auto["What happens automatically"]
+    direction TB
+    A1["Spring collects the new\n@Component into the registry"]
+    A2["PaymentController accepts\nX-Payment-Method: APPLEPAY\nwith zero code change"]
+    A3["/api/payment-methods\nnow lists APPLEPAY"]
+    A4["React form renders the new\nfields with zero code change"]
+  end
+
+  subgraph Untouched["Never modified"]
+    direction TB
+    U1["PaymentController"]
+    U2["PaymentProcessorRegistry"]
+    U3["PaymentMethodHeaderFilter"]
+    U4["CardPaymentProcessor"]
+    U5["PaypalPaymentProcessor"]
+  end
+
+  S3 --> A1 --> A2
+  S4 --> A3 --> A4
+
+  classDef write fill:#EDF0FC,stroke:#3454D1,color:#14171A;
+  classDef auto fill:#EAF7EE,stroke:#2E7D46,color:#1C4B2C;
+  classDef untouched fill:#F3F4F6,stroke:#B8BEC8,color:#6B7280,stroke-dasharray: 3 3;
+  class S1,S2,S3,S4 write;
+  class A1,A2,A3,A4 auto;
+  class U1,U2,U3,U4,U5 untouched;
+      </pre>
+    </div>
+  </section>
+
+  <!-- 06 UI FLOW -->
+  <section class="diagram-section" id="ui">
+    <div class="section-head">
+      <span class="section-num">06</span>
+      <h2>Data-driven UI flow</h2>
+    </div>
+    <p class="section-desc">
+      The React form never hard-codes a field name — it renders whatever the backend's field-config
+      says exists for the selected method.
+    </p>
+    <div class="panel">
+      <pre class="mermaid">
+flowchart TD
+  A["App loads"] --> B["GET /api/payment-methods"]
+  B --> C["Populate method dropdown\n(e.g. CARD, PAYPAL)"]
+  C --> D["User selects a method"]
+  D --> E["GET /api/payment-methods/{method}/fields"]
+  E --> F["Render inputs generically\nfrom FieldDefinition list\n(text / number / select)"]
+  F --> G["User fills form, clicks Pay"]
+  G --> H["POST /api/payments\nheader: X-Payment-Method\nbody: collected field values"]
+  H --> I{"2xx?"}
+  I -- Yes --> J["Show transactionId + status"]
+  I -- No --> K["Show error message + message field"]
+
+  classDef step fill:#FFFFFF,stroke:#DFE3E8,color:#14171A;
+  classDef term fill:#EDF0FC,stroke:#3454D1,color:#14171A;
+  class A,C,F,J,K step;
+  class B,E,H term;
+      </pre>
+    </div>
+  </section>
+
+  <footer>
+    Payment Processing System — Architecture Reference · Strategy + Template Method + Adapter, wired via Spring DI
+  </footer>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      background: '#FFFFFF',
+      primaryColor: '#EDF0FC',
+      primaryTextColor: '#14171A',
+      primaryBorderColor: '#3454D1',
+      lineColor: '#4B5261',
+      secondaryColor: '#F3F4F6',
+      tertiaryColor: '#FFFFFF',
+      fontFamily: 'IBM Plex Mono, ui-monospace, monospace',
+      fontSize: '13px'
+    },
+    flowchart: { curve: 'basis', htmlLabels: true },
+    sequence: { actorMargin: 60, boxMargin: 10, messageFontSize: 12.5 }
+  });
+</script>
+</body>
+</html>
