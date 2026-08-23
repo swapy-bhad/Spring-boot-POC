@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="payment-system">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/payment-system.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

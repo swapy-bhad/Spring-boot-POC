@@ -1,0 +1,6 @@
+[
+  { "name": "paypalOrderId", "label": "PayPal Order ID", "type": "text",   "required": true, "pattern": null, "options": null },
+  { "name": "payerId",       "label": "Payer ID",        "type": "text",   "required": true, "pattern": null, "options": null },
+  { "name": "amount",        "label": "Amount",          "type": "number", "required": true, "pattern": null, "options": null },
+  { "name": "currency",      "label": "Currency",        "type": "select", "required": true, "pattern": null, "options": ["USD", "EUR", "GBP"] }
+]

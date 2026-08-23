@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.example.payment.PaymentApplicationTests
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.078 s -- in com.example.payment.PaymentApplicationTests
