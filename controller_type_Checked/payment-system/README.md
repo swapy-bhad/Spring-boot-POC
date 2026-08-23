@@ -186,3 +186,148 @@ curl -X POST http://localhost:8080/api/payments \
   -H "X-Payment-Method: PAYPAL" \
   -d '{"type":"PAYPAL","paypalOrderId":"ORDER-1","payerId":"PAYER-1","amount":42.50,"currency":"USD"}'
 ```
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                         PAYMENT SERVICE                             │
+│                                                                     │
+│  ┌──────────────┐        ┌───────────────────┐                      │
+│  │ REST         │        │ Payment           │                      │
+│  │ Controller   │───────►│ Orchestrator      │                      │
+│  └──────────────┘        └─────────┬─────────┘                      │
+│                                    │                                │
+│                         ┌──────────▼──────────┐                     │
+│                         │ Handler Registry     │                     │
+│                         └──────────┬──────────┘                     │
+│                                    │                                │
+│             ┌──────────────────────┼──────────────────────┐         │
+│             │                      │                      │         │
+│             ▼                      ▼                      ▼         │
+│     ┌────────────────┐    ┌────────────────┐    ┌────────────────┐│
+│     │ Card Handler   │    │ PayPal Handler  │    │ Future Handler ││
+│     └───────┬────────┘    └───────┬────────┘    └────────────────┘│
+│             │                     │                                 │
+│       ┌─────▼─────┐         ┌─────▼─────┐                          │
+│       │ Validator │         │ Validator │                          │
+│       └─────┬─────┘         └─────┬─────┘                          │
+│             │                     │                                 │
+│       ┌─────▼─────┐         ┌─────▼─────┐                          │
+│       │   Mapper  │         │   Mapper  │                          │
+│       └─────┬─────┘         └─────┬─────┘                          │
+│             │                     │                                 │
+│       ┌─────▼─────┐         ┌─────▼─────┐                          │
+│       │  Gateway  │         │  Gateway  │                          │
+│       │  Adapter  │         │  Adapter  │                          │
+│       └───────────┘         └───────────┘                          │
+│                                                                     │
+│  ┌────────────────┐  ┌────────────────┐  ┌─────────────────────┐  │
+│  │ Idempotency    │  │ Payment State  │  │ Repository          │  │
+│  │ Service        │  │ Manager        │  │                     │  │
+│  └────────────────┘  └────────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+                    <<interface>>
+                 PaymentMethodHandler
+                         ▲
+              ┌──────────┴──────────┐
+              │                     │
+      CardPaymentHandler     PaypalPaymentHandler
+              │                     │
+              │                     │
+      CardPaymentValidator   PaypalPaymentValidator
+              │                     │
+              ▼                     ▼
+       CardGatewayMapper      PaypalGatewayMapper
+              │                     │
+              ▼                     ▼
+       CardGatewayAdapter      PaypalGatewayAdapter
+              │                     │
+              └──────────┬──────────┘
+                         │
+                  <<interface>>
+                  PaymentGateway
+
+
+PaymentRequest
+│
+▼
+PaymentContext
+│
+├── PaymentMethod
+├── Money
+├── Merchant
+├── Order
+└── PaymentDetails
+│
+┌─────┴─────┐
+│           │
+Card        PayPal
+Details       Details
+
+
+
+E-2-E
+Client
+│
+│ POST /payments
+▼
+Controller
+│
+├── Validate common DTO
+│
+▼
+Idempotency Service
+│
+├── Check key
+│
+▼
+Payment Orchestrator
+│
+├── Create Payment ID
+├── Persist CREATED
+│
+▼
+Handler Registry
+│
+├── CARD
+▼
+Card Handler
+│
+├── Validate Card Details
+├── Build PaymentContext
+▼
+Card Mapper
+│
+├── Internal DTO → Gateway DTO
+▼
+Card Gateway Adapter
+│
+├── Add auth headers
+├── Add gateway idempotency key
+├── HTTP call
+▼
+External Card Gateway
+│
+├── AUTH
+▼
+Response
+│
+▼
+Gateway Adapter
+│
+├── Vendor response → GatewayResponse
+▼
+Payment Orchestrator
+│
+├── Update state
+├── Persist transaction
+├── Publish event
+▼
+PaymentResponse
+│
+▼
+Client
